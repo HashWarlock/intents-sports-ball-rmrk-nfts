@@ -11,7 +11,7 @@ async function main() {
 async function deployContracts(): Promise<void> {
   console.log('Deploying smart simple equippable contract');
 
-  const contractFactory = await ethers.getContractFactory('SimpleEquippable');
+  const sportFactory = await ethers.getContractFactory('Sport');
   const initData: InitDataNativePay.InitDataStruct = {
     royaltyRecipient: ethers.constants.AddressZero,
     royaltyPercentageBps: 1000,
@@ -19,7 +19,7 @@ async function deployContracts(): Promise<void> {
     pricePerMint: ethers.utils.parseEther('1.0'),
   };
 
-  const kanaria: SimpleEquippable = await contractFactory.deploy(
+  const kanaria: SimpleEquippable = await sportFactory.deploy(
     'Kanaria',
     'KAN',
     'ipfs://collectionMeta',
