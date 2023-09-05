@@ -1,107 +1,165 @@
-import { ethers } from "hardhat";
-import { Sport, Team } from "../typechain-types";
-import { ContractTransaction } from "ethers";
+import { ethers } from 'hardhat';
 
 async function main() {
-    const pricePerMint = ethers.utils.parseEther("0.0001");
-    const totalTokens = 5;
-    const [owner] = await ethers.getSigners();
+  console.log('Getting signers');
 
-    const sportFactory = await ethers.getContractFactory("Sport");
-    const parent: Sport = await sportFactory.deploy(
-        "Sport",
-        "NSP",
-        "ipfs://collectionMeta",
-        "ipfs://tokenMeta",
-        {
-            erc20TokenAddress: ethers.constants.AddressZero,
-            tokenUriIsEnumerable: true,
-            royaltyRecipient: await owner.getAddress(),
-            royaltyPercentageBps: 0,
-            maxSupply: 3,
-            pricePerMint: pricePerMint
-        }
-    );
-    const teamFactory = await ethers.getContractFactory("Team");
-    const child: Team = await teamFactory.deploy(
-        "Team",
-        "NTM",
-        "ipfs://collectionMeta",
-        "ipfs://tokenMeta",
-        {
-            erc20TokenAddress: ethers.constants.AddressZero,
-            tokenUriIsEnumerable: true,
-            royaltyRecipient: await owner.getAddress(),
-            royaltyPercentageBps: 0,
-            maxSupply: 32,
-            pricePerMint: pricePerMint
-        }
-    );
+  const [owner, user] = await ethers.getSigners();
 
-    await parent.deployed();
-    await child.deployed();
-    console.log(
-        `Sample contracts deployed to ${parent.address} and ${child.address}`
-    );
+  console.log(`Owner: ${owner.address}`);
+  console.log(`User: ${user.address}`);
 
-    // Mint tokens 1 to totalTokens
-    console.log("Minting parent NFTs");
-    let tx = await parent.mint(owner.address, totalTokens, {
-        value: pricePerMint.mul(totalTokens),
-    });
-    await tx.wait();
-    console.log(`Minted ${totalTokens} tokens`);
-    let totalSupply = await parent.totalSupply();
-    console.log("Total parent tokens: %s", totalSupply);
+  console.log('Deploying the smart contracts');
 
-    // Mint 2 children on each parent
-    console.log("Minting child NFTs");
-    let allTx: ContractTransaction[] = [];
-    for (let i = 1; i <= totalTokens; i++) {
-        let tx = await child.nestMint(parent.address, 2, i, {
-            value: pricePerMint.mul(2),
-        });
-        allTx.push(tx);
-    }
-    console.log("Added 2 chunkies per kanaria");
-    console.log("Awaiting for all tx to finish...");
-    await Promise.all(allTx.map((tx) => tx.wait()));
+  const Sport = await ethers.getContractFactory('Sport');
+  const Team = await ethers.getContractFactory('Team');
 
-    totalSupply = await child.totalSupply();
-    console.log("Total child tokens: %s", totalSupply);
+  const sport = await Sport.deploy('Sport', 'SPRT', 3);
+  await sport.deployed();
 
-    console.log("Inspecting child NFT with the ID of 1");
-    let parentId = await child.ownerOf(1);
-    let rmrkParent = await child.directOwnerOf(1);
-    console.log("Chunky's id 1 owner  is ", parentId);
-    console.log("Chunky's id 1 rmrk owner is ", rmrkParent);
-    console.log("Parent address: ", parent.address);
+  const team = await Team.deploy('Team', 'TEAM');
+  await team.deployed();
 
-    // Accept the first child for kanaria id 1:
-    console.log("Accepting the fist child NFT for the parent NFT with ID 1");
-    tx = await parent.acceptChild(1, 0, child.address, 1);
-    await tx.wait();
+  console.log(`Sport smart contract deployed to ${sport.address}.`);
+  console.log(`Team smart contract deployed to ${team.address}.`);
 
-    // Show accepted and pending children
-    console.log(
-        "Exaimning accepted and pending children of parent NFT with ID 1"
-    );
-    console.log("Children: ", await parent.childrenOf(1));
-    console.log("Pending: ", await parent.pendingChildrenOf(1));
+  console.log('Minting Sport NFTs');
 
-    // Send 1st child to owner:
-    console.log("Removing the nested NFT from the parent token with the ID of 1");
-    tx = await parent.transferChild(1, owner.address, 0, 0, child.address, 1, false, "0x");
-    await tx.wait();
+  await sport.mint(owner.address, 3);
+  //await album.mint(user.address, 1);
 
-    parentId = await child.ownerOf(1);
-    rmrkParent = await child.directOwnerOf(1);
-    console.log("Chunky's id 1 parent is ", parentId);
-    console.log("Chunky's id 1 rmrk owner is ", rmrkParent);
+  console.log(`Sport balance of owner: ${await sport.balanceOf(owner.address)}`);
+  //console.log(`Sport balance of user: ${await album.balanceOf(user.address)}`);
+
+  console.log('Adding asset entries to the Sport smart contract');
+
+  await sport.addAssetEntry(
+    'ipfs://QmUuu6oBfY8QAPzyUugjxw5u41qKcp4hrYyWCt7wGmCJ7C/sporty-profile.png',
+  );
+  await sport.addAssetEntry(
+    'ipfs://QmbiM5vdezttJRQq97X9t3qQ271S97fQZ57okTvu96kQy4/intentssportsball-baseball.png',
+  );
+  await sport.addAssetEntry(
+    'ipfs://QmbiM5vdezttJRQq97X9t3qQ271S97fQZ57okTvu96kQy4/intentssportsball-football.png',
+  );
+  await sport.addAssetEntry(
+    'ipfs://QmbiM5vdezttJRQq97X9t3qQ271S97fQZ57okTvu96kQy4/intentssportsball-bball.png',
+  );
+
+  console.log('Adding assets to the Sport NFTs');
+
+  await sport.addAssetToTokens([1, 2, 3], 1);
+  await sport.addAssetToTokens([1], 2);
+  await sport.addAssetToTokens([2], 3);
+  await sport.addAssetToTokens([3], 4);
+
+  console.log(`Active assets of Sport NFT 1: ${(await sport.getActiveAssets(1)).length}`);
+  console.log(`Pending assets of Sport NFT 1: ${(await sport.getPendingAssets(1)).length}`);
+  console.log(`Active assets of Sport NFT 2: ${(await sport.getActiveAssets(2)).length}`);
+  console.log(`Pending assets of Sport NFT 2: ${(await sport.getPendingAssets(2)).length}`);
+  console.log(`Active assets of Sport NFT 3: ${(await sport.getActiveAssets(3)).length}`);
+  console.log(`Pending assets of Sport NFT 3: ${(await sport.getPendingAssets(3)).length}`);
+
+  //console.log('Accepting assets for Sport NFT 3');
+
+  // await album.connect(user).acceptAsset(3, 0, 1);
+  // await album.connect(user).acceptAsset(3, 0, 2);
+
+  // console.log(`Active assets of Sport NFT 3: ${(await album.getActiveAssets(3)).length}`);
+  // console.log(`Pending assets of Sport NFT 3: ${(await album.getPendingAssets(3)).length}`);
+
+  console.log('Minting Song NFTs into Sport NFTs');
+
+  await team.nestMint(sport.address, 1, 30);
+  await team.nestMint(sport.address, 2, 32);
+  await team.nestMint(sport.address, 3, 32);
+
+  console.log(`Active child tokens of Sport NFT 1: ${(await sport.childrenOf(1)).length}`);
+  console.log(`Pending child tokens of Sport NFT 1: ${(await sport.pendingChildrenOf(1)).length}`);
+  console.log(`Active child tokens of Sport NFT 2: ${(await sport.childrenOf(2)).length}`);
+  console.log(`Pending child tokens of Sport NFT 2: ${(await sport.pendingChildrenOf(2)).length}`);
+  console.log(`Active child tokens of Sport NFT 3: ${(await sport.childrenOf(3)).length}`);
+  console.log(`Pending child tokens of Sport NFT 3: ${(await sport.pendingChildrenOf(3)).length}`);
+
+  console.log('Accepting child tokens for Sport NFTs');
+
+  await sport.acceptChild(1, 0, team.address, 1); // (tokenId, index, childContract, childTokenId)
+  await sport.acceptChild(1, 0, team.address, 3);
+  await sport.acceptChild(1, 0, team.address, 2);
+  await sport.acceptChild(2, 0, team.address, 4);
+  await sport.acceptChild(2, 0, team.address, 6);
+  await sport.acceptChild(2, 0, team.address, 5);
+  // await album.connect(user).acceptChild(3, 0, team.address, 7);
+  // await album.connect(user).acceptChild(3, 0, team.address, 9);
+  // await album.connect(user).acceptChild(3, 0, team.address, 8);
+
+  console.log(`Active child tokens of Sport NFT 1: ${(await sport.childrenOf(1)).length}`);
+  console.log(`Pending child tokens of Sport NFT 1: ${(await sport.pendingChildrenOf(1)).length}`);
+  console.log(`Active child tokens of Sport NFT 2: ${(await sport.childrenOf(2)).length}`);
+  console.log(`Pending child tokens of Sport NFT 2: ${(await sport.pendingChildrenOf(2)).length}`);
+  console.log(`Active child tokens of Sport NFT 3: ${(await sport.childrenOf(3)).length}`);
+  console.log(`Pending child tokens of Sport NFT 3: ${(await sport.pendingChildrenOf(3)).length}`);
+
+  console.log('Adding asset entries to the Song smart contract');
+
+  await team.addAssetEntry('ipfs://audio1');
+  await team.addAssetEntry('ipfs://metadata1');
+  await team.addAssetEntry('ipfs://lyrics1');
+  await team.addAssetEntry('ipfs://audio2');
+  await team.addAssetEntry('ipfs://metadata2');
+  await team.addAssetEntry('ipfs://lyrics2');
+  await team.addAssetEntry('ipfs://audio3');
+  await team.addAssetEntry('ipfs://metadata3');
+  await team.addAssetEntry('ipfs://lyrics3');
+
+  console.log('Adding assets to the Team NFTs');
+
+  await team.addAssetToTokens([1, 4, 7], [1, 2, 3]);
+  await team.addAssetToTokens([2, 5, 8], [4, 5, 6]);
+  await team.addAssetToTokens([3, 6, 9], [7, 8, 9]);
+
+  console.log(`Active assets of Team NFT 1: ${(await team.getActiveAssets(1)).length}`);
+  console.log(`Pending assets of Team NFT 1: ${(await team.getPendingAssets(1)).length}`);
+  console.log(`Active assets of Team NFT 4: ${(await team.getActiveAssets(4)).length}`);
+  console.log(`Pending assets of Team NFT 4: ${(await team.getPendingAssets(4)).length}`);
+  console.log(`Active assets of Team NFT 7: ${(await team.getActiveAssets(7)).length}`);
+  console.log(`Pending assets of Team NFT 7: ${(await team.getPendingAssets(7)).length}`);
+
+  console.log('Accepting assets for the Team NFTs not belonging to the owner');
+
+  // await team.connect(user).acceptAsset(7, 0, 1);
+  // await team.connect(user).acceptAsset(7, 0, 3);
+  // await team.connect(user).acceptAsset(7, 0, 2);
+  // await team.connect(user).acceptAsset(8, 0, 4);
+  // await team.connect(user).acceptAsset(8, 0, 6);
+  // await team.connect(user).acceptAsset(8, 0, 5);
+  // await team.connect(user).acceptAsset(9, 0, 7);
+  // await team.connect(user).acceptAsset(9, 0, 9);
+  // await team.connect(user).acceptAsset(9, 0, 8);
+
+  console.log(`Active assets of Song NFT 1: ${(await team.getActiveAssets(1)).length}`);
+  console.log(`Pending assets of Song NFT 1: ${(await team.getPendingAssets(1)).length}`);
+  console.log(`Active assets of Song NFT 4: ${(await team.getActiveAssets(4)).length}`);
+  console.log(`Pending assets of Song NFT 4: ${(await team.getPendingAssets(4)).length}`);
+  console.log(`Active assets of Song NFT 7: ${(await team.getActiveAssets(7)).length}`);
+  console.log(`Pending assets of Song NFT 7: ${(await team.getPendingAssets(7)).length}`);
+
+  console.log('Observing the child-parent relationship');
+
+  console.log(`Children of Sport NFT 1: ${await sport.childrenOf(1)}`);
+  console.log(`Children of Sport NFT 2: ${await sport.childrenOf(2)}`);
+  console.log(`Children of Sport NFT 3: ${await sport.childrenOf(3)}`);
+  console.log(`Parent of Sport NFT 1: ${await sport.directOwnerOf(1)}`);
+  console.log(`Parent of Team NFT 1: ${await team.directOwnerOf(1)}`);
+  console.log(`Parent of Team NFT 4: ${await team.directOwnerOf(4)}`);
+  console.log(`Parent of Team NFT 7: ${await team.directOwnerOf(7)}`);
+  console.log(`Owner of Team NFT 1: ${await team.ownerOf(1)}`);
+  console.log(`Owner of Team NFT 4: ${await team.ownerOf(4)}`);
+  console.log(`Owner of Team NFT 7: ${await team.ownerOf(7)}`);
 }
 
-// main2();
-main().catch((error) => {
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
     console.error(error);
-    process.exitCode = 1;
-});
+    process.exit(1);
+  });
